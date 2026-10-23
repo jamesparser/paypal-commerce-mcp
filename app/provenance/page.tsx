@@ -112,7 +112,7 @@ export default function ProvenancePage() {
         ))}
       </div>
 
-      <div className="flex min-h-[420px] flex-1 flex-col">
+      <div className="flex h-[480px] flex-col">
         <DataGrid
           rows={filtered}
           columns={[
