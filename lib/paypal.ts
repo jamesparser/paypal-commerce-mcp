@@ -75,6 +75,20 @@ async function listAll<T>(path: string, key: string, pageSize: number): Promise<
   }
 }
 
+
+// Soft-fail wrappers so the UI shows an empty grid instead of a hard error page
+// when a PayPal feature (for example Transaction Search) is not enabled on the app.
+function soft<T>(fallback: T) {
+  return async (fn: () => Promise<T>): Promise<T> => {
+    try {
+      return await fn();
+    } catch (err) {
+      console.error("PayPal call failed, returning fallback:", err);
+      return fallback;
+    }
+  };
+}
+
 export type Money = { value: string; currency_code: string };
 
 // PayPal sends amounts as decimal strings; missing amounts count as 0.
@@ -114,11 +128,19 @@ export type Plan = {
 // The list endpoints return summaries (no product type/category, no billing cycles),
 // so each record is fetched in full.
 export async function listProducts(): Promise<Product[]> {
+  return soft<Product[]>([])(() => listProductsInner());
+}
+
+async function listProductsInner(): Promise<Product[]> {
   const summaries = await listAll<{ id: string }>('/v1/catalogs/products?total_required=true', 'products', 20);
   return Promise.all(summaries.map((p) => get<Product>(`/v1/catalogs/products/${encodeURIComponent(p.id)}`)));
 }
 
 export async function listPlans(): Promise<Plan[]> {
+  return soft<Plan[]>([])(() => listPlansInner());
+}
+
+async function listPlansInner(): Promise<Plan[]> {
   const summaries = await listAll<{ id: string }>('/v1/billing/plans?total_required=true', 'plans', 20);
   return Promise.all(summaries.map((p) => get<Plan>(`/v1/billing/plans/${encodeURIComponent(p.id)}`)));
 }
@@ -178,6 +200,10 @@ export type Invoice = {
 
 // The list omits line items, payments and refunds; the detail endpoint has them.
 export async function listInvoices(): Promise<Invoice[]> {
+  return soft<Invoice[]>([])(() => listInvoicesInner());
+}
+
+async function listInvoicesInner(): Promise<Invoice[]> {
   const summaries = await listAll<{ id: string }>('/v2/invoicing/invoices?total_required=true', 'items', 100);
   return Promise.all(summaries.map((i) => get<Invoice>(`/v2/invoicing/invoices/${encodeURIComponent(i.id)}`)));
 }
@@ -205,6 +231,10 @@ export type Transaction = {
 export const TRANSACTION_SEARCH_MAX_DAYS = 31;
 
 export function searchTransactions(start: Date, end: Date): Promise<Transaction[]> {
+  return soft<Transaction[]>([])(() => searchTransactionsInner(start, end));
+}
+
+function searchTransactionsInner(start: Date, end: Date): Promise<Transaction[]> {
   const iso = (d: Date) => `${d.toISOString().slice(0, 19)}Z`;
   return listAll<Transaction>(
     `/v1/reporting/transactions?start_date=${iso(start)}&end_date=${iso(end)}&fields=all`,
@@ -219,5 +249,5 @@ export type Balances = {
 };
 
 export function getBalances(): Promise<Balances> {
-  return get<Balances>('/v1/reporting/balances');
+  return soft<Balances>({ balances: [] })(() => get<Balances>('/v1/reporting/balances'));
 }
