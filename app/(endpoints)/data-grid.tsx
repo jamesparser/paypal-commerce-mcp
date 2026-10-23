@@ -50,10 +50,19 @@ const theme = themeQuartz.withParams({
 export type Row = Record<string, unknown>;
 
 // Money columns hold numbers and format them in the row's `currency`.
-const formatMoney = ({ value, data }: ValueFormatterParams<Row>) =>
-  typeof value === 'number' && typeof data?.currency === 'string'
-    ? value.toLocaleString('en-US', { style: 'currency', currency: data.currency })
-    : '';
+const formatMoney = ({ value, data }: ValueFormatterParams<Row>) => {
+  if (typeof value !== 'number') return '';
+  const code = typeof data?.currency === 'string' ? data.currency : '';
+  // Crypto codes like USDC are not ISO 4217; Intl throws on them.
+  if (!code || !/^[A-Z]{3}$/.test(code)) {
+    return code ? `${value.toLocaleString('en-US', { maximumFractionDigits: 6 })} ${code}` : value.toLocaleString('en-US');
+  }
+  try {
+    return value.toLocaleString('en-US', { style: 'currency', currency: code });
+  } catch {
+    return `${value.toLocaleString('en-US')} ${code}`;
+  }
+};
 
 const columnTypes: ColTypeDefs<Row> = {
   money: { valueFormatter: formatMoney, filter: 'agNumberColumnFilter' },
