@@ -1,16 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AgGridReact } from "ag-grid-react";
-import { AllCommunityModule, ModuleRegistry } from "ag-grid-community";
-
-ModuleRegistry.registerModules([AllCommunityModule]);
+import { DataGrid } from "@/app/(endpoints)/data-grid";
 
 type Row = {
   id: string;
   ts: string;
   type: string;
-  rail: "x401" | "x402" | "paypal";
+  rail: string;
   agent_id: string;
   counterparty?: string;
   amount?: number;
@@ -22,16 +19,18 @@ type Row = {
 const DEMO: Row[] = [
   {
     id: "led_demo_1",
-    ts: new Date().toISOString(),
+    ts: new Date(Date.now() - 120000).toISOString(),
     type: "identity",
     rail: "x401",
     agent_id: "omega-1",
     detail: "identity issued",
     status: "ok",
+    currency: "USD",
+    amount: 0,
   },
   {
     id: "led_demo_2",
-    ts: new Date().toISOString(),
+    ts: new Date(Date.now() - 60000).toISOString(),
     type: "settle_x402_dryrun",
     rail: "x402",
     agent_id: "omega-1",
@@ -57,7 +56,7 @@ const DEMO: Row[] = [
 
 export default function ProvenancePage() {
   const [rows, setRows] = useState<Row[]>(DEMO);
-  const [railFilter, setRailFilter] = useState<string>("all");
+  const [railFilter, setRailFilter] = useState("all");
 
   useEffect(() => {
     fetch("/api/ledger")
@@ -80,10 +79,10 @@ export default function ProvenancePage() {
   }, [rows]);
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-10">
-      <header className="mb-8">
+    <main className="mx-auto flex min-h-screen max-w-6xl flex-col gap-6 px-4 py-10">
+      <header>
         <p className="text-sm uppercase tracking-widest text-zinc-500">OmegaCommerce</p>
-        <h1 className="text-3xl font-semibold tracking-tight">Fund provenance</h1>
+        <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Fund provenance</h1>
         <p className="mt-2 max-w-2xl text-zinc-600">
           Every settlement an agent makes, on either rail. x401 is identity, x402 is
           agent-to-agent USDC, PayPal is the human economy. Click a row to see where the
@@ -91,13 +90,13 @@ export default function ProvenancePage() {
         </p>
       </header>
 
-      <section className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Card label="x402 USDC settled" value={`$${totals.usdc.toFixed(2)}`} hint="agent to agent" />
         <Card label="PayPal USD settled" value={`$${totals.usd.toFixed(2)}`} hint="invoices and payouts" />
         <Card label="Ledger events" value={String(totals.count)} hint="all rails" />
       </section>
 
-      <div className="mb-3 flex gap-2">
+      <div className="flex gap-2">
         {["all", "x401", "x402", "paypal"].map((r) => (
           <button
             key={r}
@@ -113,21 +112,19 @@ export default function ProvenancePage() {
         ))}
       </div>
 
-      <div className="h-[420px] w-full rounded-lg border border-zinc-200">
-        <AgGridReact
-          rowData={filtered}
-          columnDefs={[
-            { field: "ts", headerName: "Time", flex: 1 },
-            { field: "agent_id", headerName: "Agent (x401)", flex: 1 },
-            { field: "counterparty", headerName: "Counterparty", flex: 1 },
-            { field: "rail", headerName: "Rail", width: 100 },
-            { field: "type", headerName: "Type", flex: 1 },
-            { field: "amount", headerName: "Amount", width: 110 },
-            { field: "currency", headerName: "CCY", width: 80 },
-            { field: "status", headerName: "Status", width: 110 },
-            { field: "detail", headerName: "Provenance", flex: 1.4 },
+      <div className="flex min-h-[420px] flex-1 flex-col">
+        <DataGrid
+          rows={filtered}
+          columns={[
+            { field: "ts", headerName: "Time" },
+            { field: "agent_id", headerName: "Agent (x401)" },
+            { field: "counterparty", headerName: "Counterparty" },
+            { field: "rail", headerName: "Rail" },
+            { field: "type", headerName: "Type" },
+            { field: "amount", headerName: "Amount", type: "money" },
+            { field: "status", headerName: "Status" },
+            { field: "detail", headerName: "Provenance" },
           ]}
-          defaultColDef={{ sortable: true, filter: true, resizable: true }}
         />
       </div>
     </main>
@@ -138,7 +135,7 @@ function Card({ label, value, hint }: { label: string; value: string; hint: stri
   return (
     <div className="rounded-xl border border-zinc-200 p-4">
       <p className="text-xs uppercase tracking-wider text-zinc-500">{label}</p>
-      <p className="mt-1 text-2xl font-semibold">{value}</p>
+      <p className="mt-1 text-2xl font-semibold text-slate-900">{value}</p>
       <p className="text-xs text-zinc-500">{hint}</p>
     </div>
   );
